@@ -46,18 +46,7 @@ function automatic integer _clog2(integer value);
    *   logic [vbits(64 + 1)-1:0] store_number_64;       // width is [6:0]
    */
   function automatic integer vbits(integer value);
-`ifdef XCELIUM
-    // The use of system functions was not allowed here in Verilog-2001, but is
-    // valid since (System)Verilog-2005, which is also when $clog2() first
-    // appeared.
-    // Xcelium < 19.10 does not yet support the use of $clog2() here, fall back
-    // to an implementation without a system function. Remove this workaround
-    // if we require a newer Xcelium version.
-    // See #2579 and #2597.
-    return (value == 1) ? 1 : prim_util_pkg::_clog2(value);
-`else
     return (value == 1) ? 1 : $clog2(value);
-`endif
   endfunction
 
     localparam int TL_AW=32;

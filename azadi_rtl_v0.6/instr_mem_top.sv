@@ -2,7 +2,7 @@ module instr_mem_top
 (
   input clk_i,
   input rst_ni,
-  
+
   input  tlul_pkg::tl_h2d_t tl_i,
   output tlul_pkg::tl_d2h_t tl_o,
 // iccm controller interface 
@@ -67,6 +67,7 @@ assign wmask_o = (prog_rst_ni) ? mask_sel : 4'b1111;
   .rvalid_i  (rvalid),
   .rerror_i  (2'b0)
 );
+
 
  always_ff @(posedge clk_i) begin
   if (!rst_ni) begin

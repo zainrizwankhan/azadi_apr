@@ -1,4 +1,3 @@
-`include "utils.vh"
 module sram_top
  #(  parameter NUM_WMASKS    = 4,
      parameter MEMD = 2048,

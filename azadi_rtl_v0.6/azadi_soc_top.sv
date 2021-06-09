@@ -1,4 +1,4 @@
-
+`define SPI_SS_NB 4
 module azadi_soc_top (
   input clk_i,
   input rst_ni,
@@ -45,9 +45,99 @@ localparam logic [31:0] JTAG_ID = {
   1'b1      // (fixed)
 };
 
+// instruction sram interface 
+logic        instr_csb;
+logic [11:0] instr_addr;
+logic [31:0] instr_wdata;
+logic [3:0]  instr_wmask;
+logic        instr_we;
+logic [31:0] instr_rdata;
 
-  logic prog_rst_n;
-  logic system_rst_ni;
+// data sram interface
+logic        data_csb;
+logic [11:0] data_addr;
+logic [31:0] data_wdata;
+logic [3:0]  data_wmask;
+logic        data_we;
+logic [31:0] data_rdata;
+
+logic dbg_req;
+
+logic prog_rst_n;
+logic system_rst_ni;
+
+tlul_pkg::tl_h2d_t ifu_to_xbar;
+tlul_pkg::tl_d2h_t xbar_to_ifu;
+tlul_pkg::tl_h2d_t xbar_to_iccm;
+tlul_pkg::tl_d2h_t iccm_to_xbar;
+
+tlul_pkg::tl_h2d_t lsu_to_xbar;
+tlul_pkg::tl_d2h_t xbar_to_lsu;
+tlul_pkg::tl_h2d_t xbar_to_dccm;
+tlul_pkg::tl_d2h_t dccm_to_xbar;
+
+logic        intr_req;
+//logic        intr_srx;
+//logic        intr_stx;
+logic        intr_timer;
+
+
+brq_core_top #(
+    .PMPEnable        (1'b0),
+    .PMPGranularity   (0), 
+    .PMPNumRegions    (4), 
+    .MHPMCounterNum   (0), 
+    .MHPMCounterWidth (40), 
+    .RV32E            (1'b0), 
+    .RV32M            (brq_pkg::RV32MSlow), 
+    .RV32B            (brq_pkg::RV32BNone), 
+    .RegFile          (brq_pkg::RegFileFF), 
+    .BranchTargetALU  (1'b0), 
+    .WritebackStage   (1'b1), 
+    .ICache           (1'b0), 
+    .ICacheECC        (1'b0), 
+    .BranchPredictor  (1'b0), 
+    .DbgTriggerEn     (1'b1), 
+    .DbgHwBreakNum    (1), 
+    .Securebrq        (1'b0),
+    .DmHaltAddr       (tl_main_pkg::ADDR_SPACE_DEBUG_ROM + 32'h 800), 
+    .DmExceptionAddr  (tl_main_pkg::ADDR_SPACE_DEBUG_ROM + dm::ExceptionAddress) 
+) u_top (
+    .clk_i (clk_i),
+    .rst_ni (system_rst_ni),
+
+  // instruction memory interface 
+    .tl_i_i (iccm_to_xbar), // xbar_to_ifu
+    .tl_i_o (xbar_to_iccm), // ifu_to_xbar
+
+  // data memory interface 
+    .tl_d_i (dccm_to_xbar), // xbar_to_lsu
+    .tl_d_o (xbar_to_dccm), // lsu_to_xbar
+
+    //.test_en_i   (1'b0),     // enable all clk_i gates for testing
+
+    .hart_id_i   (32'b0), 
+    .boot_addr_i (32'h20000000),
+
+        // Interrupt inputs
+    .irq_software_i (1'b0),
+    .irq_timer_i    (1'b0), // intr_timer
+    .irq_external_i (1'b0), // intr_req
+    .irq_fast_i     ('0),
+    .irq_nm_i       (1'b0),       // non-maskeable interrupt
+
+    // Debug Interface
+    .debug_req_i    (1'b0), // dbg_req
+    
+    // CPU Control Signals
+    .fetch_enable_i (1'b1),
+    .alert_minor_o  (),
+    .alert_major_o  (),
+    .core_sleep_o   ()
+);
+
+/*
+
   logic [31:0] gpio_in;
   logic [31:0] gpio_out;
   
@@ -58,41 +148,12 @@ localparam logic [31:0] JTAG_ID = {
   logic [11:0]  tlul_addr;
   logic         req_i;
   logic [31:0]  tlul_data;
-  logic dbg_req;
+
   logic dbg_rst;
 
-
- // instruction sram interface 
-  logic        instr_csb;
-  logic [11:0] instr_addr;
-  logic [31:0] instr_wdata;
-  logic [3:0]  instr_wmask;
-  logic        instr_we;
-  logic [31:0] instr_rdata;
-  
-   // data sram interface
-  logic        data_csb;
-  logic [11:0] data_addr;
-  logic [31:0] data_wdata;
-  logic [3:0]  data_wmask;
-  logic        data_we;
-  logic [31:0] data_rdata;
-  
   logic [31:0] iccm_ctrl_data;
   logic        iccm_ctrl_we;
   logic [11:0] iccm_ctrl_addr_o;
-
-        
-  tlul_pkg::tl_h2d_t ifu_to_xbar;
-  tlul_pkg::tl_d2h_t xbar_to_ifu;
-  tlul_pkg::tl_h2d_t xbar_to_iccm;
-  tlul_pkg::tl_d2h_t iccm_to_xbar;
-
-  tlul_pkg::tl_h2d_t lsu_to_xbar;
-  tlul_pkg::tl_d2h_t xbar_to_lsu;
-
-  tlul_pkg::tl_h2d_t xbar_to_dccm;
-  tlul_pkg::tl_d2h_t dccm_to_xbar;
 
   tlul_pkg::tl_h2d_t xbarp_to_gpio;
   tlul_pkg::tl_d2h_t gpio_to_xbarp;
@@ -131,10 +192,6 @@ localparam logic [31:0] JTAG_ID = {
   logic        intr_uart0_rx_break_err;
   logic        intr_uart0_rx_timeout;
   logic        intr_uart0_rx_parity_err;
-  logic        intr_req;
-  logic        intr_srx;
-  logic        intr_stx;
-  logic        intr_timer;
 
   assign intr_vector = { 
       intr_srx,
@@ -163,60 +220,6 @@ localparam logic [31:0] JTAG_ID = {
   assign jtag_req.tdi    = jtag_tdi_i;
   assign jtag_tdo_o      = jtag_rsp.tdo;
   assign jtag_tdo_oe_o = jtag_rsp.tdo_oe;
-
-
-brq_core_top #(
-    .PMPEnable        (1'b0),
-    .PMPGranularity   (0), 
-    .PMPNumRegions    (4), 
-    .MHPMCounterNum   (0), 
-    .MHPMCounterWidth (40), 
-    .RV32E            (1'b0), 
-    .RV32M            (brq_pkg::RV32MSlow), 
-    .RV32B            (brq_pkg::RV32BNone), 
-    .RegFile          (brq_pkg::RegFileFF), 
-    .BranchTargetALU  (1'b0), 
-    .WritebackStage   (1'b1), 
-    .ICache           (1'b0), 
-    .ICacheECC        (1'b0), 
-    .BranchPredictor  (1'b0), 
-    .DbgTriggerEn     (1'b1), 
-    .DbgHwBreakNum    (1), 
-    .Securebrq        (1'b0),
-    .DmHaltAddr       (tl_main_pkg::ADDR_SPACE_DEBUG_ROM + 32'h 800), 
-    .DmExceptionAddr  (tl_main_pkg::ADDR_SPACE_DEBUG_ROM + dm::ExceptionAddress) 
-) u_top (
-    .clk_i (clk_i),
-    .rst_ni (system_rst_ni),
-
-  // instruction memory interface 
-    .tl_i_i (xbar_to_ifu),
-    .tl_i_o (ifu_to_xbar),
-
-  // data memory interface 
-    .tl_d_i (xbar_to_lsu),
-    .tl_d_o (lsu_to_xbar),
-
-    //.test_en_i   (1'b0),     // enable all clk_i gates for testing
-
-    .hart_id_i   (32'b0), 
-    .boot_addr_i (32'h20000000),
-
-        // Interrupt inputs
-    .irq_software_i (1'b0),
-    .irq_timer_i    (intr_timer),
-    .irq_external_i (intr_req),
-    .irq_fast_i     ('0),
-    .irq_nm_i       (1'b0),       // non-maskeable interrupt
-
-    // Debug Interface
-    .debug_req_i    (dbg_req),
-        // CPU Control Signals
-    .fetch_enable_i (1'b1),
-    .alert_minor_o  (),
-    .alert_major_o  (),
-    .core_sleep_o   ()
-);
 
 // Debug module
 rv_dm #(
@@ -349,15 +352,18 @@ gpio GPIO (
   .intr_gpio_o    (intr_gpio )  
 );
 
+*/
+
 
 rstmgr reset_manager(
   .clk_i(clk_i),
   .rst_ni(rst_ni),
-  .ndmreset (dbg_rst),
+  .ndmreset (1'b0), // dbg_rst
   .prog_rst_ni(prog_rst_ni),
   .sys_rst_ni(system_rst_ni)
 );
 
+/*
 rv_plic intr_controller (
   .clk_i(clk_i),
   .rst_ni(system_rst_ni),
@@ -397,10 +403,15 @@ uart u_uart0(
   .intr_rx_timeout_o       (intr_uart0_rx_timeout   ),
   .intr_rx_parity_err_o    (intr_uart0_rx_parity_err) 
 );
+*/
 
 logic rx_dv_i;
 logic [7:0] rx_byte_i;
-	
+logic iccm_ctrl_we;
+logic [11:0] iccm_ctrl_addr_o;
+logic [31:0] iccm_ctrl_data;
+
+
 iccm_controller u_dut(
     .clk_i      (~clk_i),
 	.rst_ni     (rst_ni),
@@ -421,7 +432,6 @@ uart_rx_prog u_uart_rx_prog(
 	.o_Rx_DV       (rx_dv_i),
 	.o_Rx_Byte     (rx_byte_i)
 );
-
 
 // dummy instruction memory
 instr_mem_top iccm_adapter(
@@ -447,31 +457,29 @@ instr_mem_top iccm_adapter(
 );
 
 
-  sram #(  
+  sram_top #(  
      .NUM_WMASKS  (4),
-     //.MEMD        (2048),
+     .MEMD        (2048),
      .DATA_WIDTH  (32), // data width
-     //.nRPORTS     (1) , // number of reading ports
-     //.nWPORTS     (1), // number of write ports
+     .nRPORTS     (1) , // number of reading ports
+     .nWPORTS     (1), // number of write ports
      .IZERO       (0) , // binary / Initial RAM with zeros (has priority over IFILE)
-     //.BASIC_MODEL (1024),
-     .ADDR_WIDTH  (10)
-    ) u_iccm ( /*`ifdef USE_POWER_PINS
-    inout vdd;
-    inout gnd;
-  `endif*/
-    .clk0      (~clk_i), // clock
-    .csb0      (instr_csb), // active low chip select
-    .web0      (instr_we), // active low write control
-    .wmask0    (instr_wmask), // write mask
-    .addr0     (instr_addr[9:0]),
-    .din0      (instr_wdata),
-    .dout0     (instr_rdata),
+     .BASIC_MODEL (1024),
+     .ADDR_WIDTH  (11)
+    ) u_iccm (
+    .clk      (~clk_i), // clock
+    .csb      (instr_csb), // active low chip select
+    .web      (instr_we), // active low write control
+    .wmask    (instr_wmask), // write mask
+    .addr     (instr_addr[10:0]),
+    .din      (instr_wdata),
+    .dout     (instr_rdata),
     .clk1     (1'b0),
     .csb1     (1'b1),
     .addr1    ('0),
     .dout1    ()
     );
+
 // dummy data memory
 
 data_mem_top dccm_adapter(
@@ -491,27 +499,23 @@ data_mem_top dccm_adapter(
    .rdata_i (data_rdata)
 );
 
-
-sram #(  
+sram_top #(  
    .NUM_WMASKS  (4),
-   //.MEMD        (2048),
+   .MEMD        (2048),
    .DATA_WIDTH  (32), // data width
-   //.nRPORTS     (1) , // number of reading ports
-   //.nWPORTS     (1), // number of write ports
+   .nRPORTS     (1) , // number of reading ports
+   .nWPORTS     (1), // number of write ports
    .IZERO       (0) , // binary / Initial RAM with zeros (has priority over IFILE)
-   //.BASIC_MODEL (1024),
-   .ADDR_WIDTH  (10)
-  ) u_dccm ( /*`ifdef USE_POWER_PINS
-  inout vdd;
-  inout gnd;
-`endif*/
-  .clk0      (~clk_i), // clock
-  .csb0      (data_csb), // active low chip select
-  .web0      (data_we), // active low write control
-  .wmask0    (data_wmask), // write mask
-  .addr0     (data_addr[9:0]),
-  .din0      (data_wdata),
-  .dout0     (data_rdata),
+   .BASIC_MODEL (1024),
+   .ADDR_WIDTH  (11)
+  ) u_dccm ( 
+  .clk      (~clk_i), // clock
+  .csb      (data_csb), // active low chip select
+  .web      (data_we), // active low write control
+  .wmask    (data_wmask), // write mask
+  .addr     (data_addr[10:0]),
+  .din      (data_wdata),
+  .dout     (data_rdata),
   .clk1      (1'b0),
   .csb1      (1'b1),
   .addr1     ('0),

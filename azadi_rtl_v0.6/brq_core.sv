@@ -862,7 +862,7 @@ assign       test_en_i = 1'b0;
   logic [RegFileDataWidth-1:0] rf_rdata_a_ecc;
   logic [RegFileDataWidth-1:0] rf_rdata_b_ecc;
   logic                        rf_ecc_err_comb;
-
+/*
   if (RegFileECC) begin : gen_regfile_ecc
 
     logic [1:0] rf_ecc_err_a, rf_ecc_err_b;
@@ -899,7 +899,7 @@ assign       test_en_i = 1'b0;
     // Combined error
     assign rf_ecc_err_comb = instr_valid_id & (rf_ecc_err_a_id | rf_ecc_err_b_id);
 
-  end else begin : gen_no_regfile_ecc
+  end else begin : gen_no_regfile_ecc */
     logic unused_rf_ren_a, unused_rf_ren_b;
     logic unused_rf_rd_a_wb_match, unused_rf_rd_b_wb_match;
 
@@ -911,11 +911,11 @@ assign       test_en_i = 1'b0;
     assign rf_rdata_a              = rf_rdata_a_ecc;
     assign rf_rdata_b              = rf_rdata_b_ecc;
     assign rf_ecc_err_comb         = 1'b0;
-  end
+ // end
 
   assign rf_int_fp_lsu = (is_fp_instr & use_fp_rs2) ? fp_rf_rdata_b : rf_rdata_b;
 
-  if (RegFile == RegFileFF) begin : gen_regfile_ff
+  //if (RegFile == RegFileFF) begin : gen_regfile_ff
     brq_register_file_ff #(
         .RV32E             ( RV32E             ),
         .DataWidth         ( RegFileDataWidth  ),
@@ -935,6 +935,7 @@ assign       test_en_i = 1'b0;
         .wdata_a_i        ( rf_wdata_wb_ecc ),
         .we_a_i           ( rf_we_wb        )
     );
+/*
   end else if (RegFile == RegFileFPGA) begin : gen_regfile_fpga
     brq_register_file_fpga #(
         .RV32E             ( RV32E             ),
@@ -975,7 +976,7 @@ assign       test_en_i = 1'b0;
         .wdata_a_i        ( rf_wdata_wb_ecc ),
         .we_a_i           ( rf_we_wb        )
     );
-  end
+  end */
 
   if (FloatingPoint) begin : gen_fp_regfile
     brq_fp_register_file_ff #(

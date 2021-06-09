@@ -55,10 +55,7 @@ module brq_core_top #(
     output logic        alert_major_o,
     output logic        core_sleep_o
 );
-import brq_pkg::*;
 
-  //logic rst_ni;
-  //assign rst_ni = rst_ni;
   // Instruction interface (internal)
   logic        instr_req;
   logic        instr_gnt;
@@ -77,8 +74,6 @@ import brq_pkg::*;
   logic [31:0] data_wdata;
   logic [31:0] data_rdata;
   logic        data_err;
-
-
 
 brq_core #(
     .PMPEnable        (PMPEnable),
