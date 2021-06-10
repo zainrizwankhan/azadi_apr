@@ -1,5 +1,3 @@
-`include "spi_defines.v"
-
 module spi_shift (
   input  wire                        clk_i,          // system clock
   input  wire                        rst_ni,          // reset
